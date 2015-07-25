@@ -67,7 +67,7 @@
                    'expect': ', '.join("'%s'" % k for k in
                                        sysinfo_serial_funcs.keys())})
 
-def _destroy(self, instance, attempt=1):
+    def _destroy(self, instance, attempt=1):
         try:
             guest = self._host.get_guest(instance)
         except exception.InstanceNotFound:
@@ -198,7 +198,7 @@ def _destroy(self, instance, attempt=1):
         self.cleanup(context, instance, network_info, block_device_info,
                      destroy_disks, migrate_data)
 
-def spawn(self, context, instance, image_meta, injected_files,
+    def spawn(self, context, instance, image_meta, injected_files,
               admin_password, network_info=None, block_device_info=None):
         disk_info = blockinfo.get_disk_info(CONF.vman.virt_type,
                                             instance,
