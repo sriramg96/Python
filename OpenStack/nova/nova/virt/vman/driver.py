@@ -1,3 +1,72 @@
+    def __init__(self, virtapi, read_only=False):
+        super(vmanDriver, self).__init__(virtapi)
+
+        global vman
+        if vman is None:
+            vman = importutils.import_module('vman')
+
+        self._host = host.Host(self._uri(), read_only,
+                               lifecycle_event_handler=self.emit_event,
+                               conn_event_handler=self._handle_conn_event)
+        self._initiator = None
+        self._fc_wwnns = None
+        self._fc_wwpns = None
+        self._caps = None
+        self.firewall_driver = firewall.load_driver(
+            DEFAULT_FIREWALL_DRIVER,
+            self.virtapi,
+            host=self._host)
+
+        self.vif_driver = vman_vif.vmanGenericVIFDriver()
+
+        self.volume_drivers = driver.driver_dict_from_config(
+            self._get_volume_drivers(), self)
+
+        self._disk_cachemode = None
+        self.image_cache_manager = imagecache.ImageCacheManager()
+        self.image_backend = imagebackend.Backend(CONF.use_cow_images)
+
+        self.disk_cachemodes = {}
+
+        self.valid_cachemodes = ["default",
+                                 "none",
+                                 "writethrough",
+                                 "writeback",
+                                 "directsync",
+                                 "unsafe",
+                                ]
+        self._conn_supports_start_paused = CONF.vman.virt_type in ('kvm',
+                                                                      'qemu')
+
+        for mode_str in CONF.vman.disk_cachemodes:
+            disk_type, sep, cache_mode = mode_str.partition('=')
+            if cache_mode not in self.valid_cachemodes:
+                LOG.warn(_LW('Invalid cachemode %(cache_mode)s specified '
+                             'for disk type %(disk_type)s.'),
+                         {'cache_mode': cache_mode, 'disk_type': disk_type})
+                continue
+            self.disk_cachemodes[disk_type] = cache_mode
+
+        self._volume_api = volume.API()
+        self._image_api = image.API()
+
+        sysinfo_serial_funcs = {
+            'none': lambda: None,
+            'hardware': self._get_host_sysinfo_serial_hardware,
+            'os': self._get_host_sysinfo_serial_os,
+            'auto': self._get_host_sysinfo_serial_auto,
+        }
+
+        self._sysinfo_serial_func = sysinfo_serial_funcs.get(
+            CONF.vman.sysinfo_serial)
+        if not self._sysinfo_serial_func:
+            raise exception.NovaException(
+                _("Unexpected sysinfo_serial setting '%(actual)s'. "
+                  "Permitted values are %(expect)s'") %
+                  {'actual': CONF.vman.sysinfo_serial,
+                   'expect': ', '.join("'%s'" % k for k in
+                                       sysinfo_serial_funcs.keys())})
+
 def _destroy(self, instance, attempt=1):
         try:
             guest = self._host.get_guest(instance)
